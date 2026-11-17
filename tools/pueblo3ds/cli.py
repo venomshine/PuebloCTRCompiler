@@ -36,7 +36,7 @@ def main(argv: list[str]) -> int:
 
     if a.cmd == "info":
         for p in a.discos:
-            ok, txt, _ = dk.describe(dk.read_disc(p))
+            ok, txt, _level = dk.describe(dk.read_disc(p))
             print(f"{p}: {txt}")
         return 0
     runtime = a.runtime or builder.default_runtime()
@@ -46,7 +46,7 @@ def main(argv: list[str]) -> int:
         return 0
 
     ds = [dk.read_disc(p) for p in a.discos[:2]]
-    ok, txt, _ = dk.check_pair(ds[0], ds[1] if len(ds) > 1 else None)
+    ok, txt, _level = dk.check_pair(ds[0], ds[1] if len(ds) > 1 else None)
     print(txt, flush=True)
     if not ok:
         return 2

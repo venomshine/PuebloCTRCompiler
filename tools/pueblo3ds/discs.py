@@ -94,7 +94,7 @@ def check_pair(first: Disc | None, second: Disc | None) -> tuple[bool, str, str]
     if not discs:
         return False, "Elige la imagen del disco 1.", "dim"
     for d in discs:
-        ok, txt, _ = describe(d)
+        ok, txt, _level = describe(d)
         if not ok:
             return False, f"{d.path.name}: {txt}", "bad"
     if len(discs) == 2:

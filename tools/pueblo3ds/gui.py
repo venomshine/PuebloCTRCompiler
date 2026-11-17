@@ -21,6 +21,8 @@ from tkinter import filedialog, ttk
 from . import PUEBLO_VERSION, __version__
 from . import build as builder
 from . import discs as dk
+from . import i18n
+from .i18n import _
 from .qrcodegen import QrCode, QrSegment
 from .serve import CiaServer
 
@@ -82,7 +84,7 @@ class Card(tk.Canvas):
         self.create_window(pad, pad, anchor="nw", window=self.inner, width=width - 2 * pad)
         self.inner.bind("<Configure>", self._fit)
 
-    def _fit(self, _=None):
+    def _fit(self, _event=None):
         h = self.inner.winfo_reqheight() + 2 * self.pad
         self.configure(height=h)
         self.delete("bg")
@@ -220,6 +222,7 @@ def _asset(name: str) -> Path:
 class Wizard(tk.Tk):
     def __init__(self, runtime: Path | None = None):
         super().__init__()
+        i18n.init()  # el idioma de la última vez, o el del sistema
         self.runtime = runtime or builder.default_runtime()
         self.title(TITLE)
         self.configure(bg=BG)
@@ -261,11 +264,11 @@ class Wizard(tk.Tk):
         self.footer.pack(side="bottom", fill="x", padx=px(28), pady=px(18))
         self.body = tk.Frame(self, bg=BG)
         self.body.pack(side="top", fill="both", expand=True, padx=px(28), pady=(px(22), 0))
-        tk.Label(self.footer, text="hecho por VENOMSHiNE", bg=BG, fg=DIM,
-                 font=_font(9)).pack(side="left")
-        self.next_btn = ttk.Button(self.footer, text="Continuar", style="Accent.TButton")
+        self.sign = tk.Label(self.footer, text=_("hecho por VENOMSHiNE"), bg=BG, fg=DIM, font=_font(9))
+        self.sign.pack(side="left")
+        self.next_btn = ttk.Button(self.footer, text=_("Continuar"), style="Accent.TButton")
         self.next_btn.pack(side="right")
-        self.back_btn = ttk.Button(self.footer, text="Atrás", style="Plain.TButton", command=self._back)
+        self.back_btn = ttk.Button(self.footer, text=_("Atrás"), style="Plain.TButton", command=self._back)
         self.back_btn.pack(side="right", padx=(0, px(8)))
         self.protocol("WM_DELETE_WINDOW", self._close)
 
@@ -391,7 +394,7 @@ class Wizard(tk.Tk):
     def _close(self):
         from tkinter import messagebox
         if self.server is not None:
-            sent, total, finished, _ = self.server.status()
+            sent, total, finished, _downloads = self.server.status()
             if 0 < sent < total and not finished:
                 if not messagebox.askyesno(TITLE, "La consola está descargando el .cia. Si sales ahora, se corta.\n\n"
                                                 "¿Salir de todos modos?"):
@@ -415,25 +418,45 @@ class Wizard(tk.Tk):
             self._icon_small = self._icon.subsample(k)
             tk.Label(head, image=self._icon_small, bg=BG).pack(side="left", padx=(0, px(14)))
             icon_w = 256 // k + px(14)
+        # el idioma, arriba a la derecha (solo aquí: cambia todo al momento)
+        lang = tk.Frame(head, bg=BG)
+        lang.pack(side="right", anchor="n")
+        self.lang_var = tk.StringVar(value=i18n.LANGS[i18n.get_lang()])
+        box = ttk.Combobox(lang, textvariable=self.lang_var, values=list(i18n.LANGS.values()), state="readonly",
+                           width=9, font=_font(10))
+        box.pack(anchor="e")
+        box.bind("<<ComboboxSelected>>", lambda e: self._set_lang())
+        lang_w = box.winfo_reqwidth() + px(12)
         txt = tk.Frame(head, bg=BG)
         txt.pack(side="left", fill="x")
-        wrap = px(CARD_W) - icon_w
+        wrap = px(CARD_W) - icon_w - lang_w
         tk.Label(txt, text=TITLE, bg=BG, fg=FG, font=_font(19, True), anchor="w", justify="left",
                  wraplength=wrap).pack(fill="x")
-        tk.Label(txt, text=f"{PUEBLO_VERSION} (asistente {__version__})  ·  el port de lonelyversemaker",
+        tk.Label(txt, text=_("{pueblo}  ·  asistente {version}\nel port de lonelyversemaker", pueblo=PUEBLO_VERSION,
+                             version=__version__),
                  bg=BG, fg=DIM, font=_font(10), anchor="w", justify="left", wraplength=wrap).pack(fill="x")
         card = self._card()
-        tk.Label(card, text="Convierte tus discos de GameCube en un solo .cia con todo el juego dentro: se instala "
-                            "y listo, sin copiar nada más a la SD. No instala nada en tu PC.",
+        tk.Label(card, text=_("Convierte tus discos de GameCube en un solo .cia con todo el juego dentro: se instala "
+                              "y listo, sin copiar nada más a la SD. No instala nada en tu PC."),
                  bg=PANEL, fg=FG, font=_font(10), anchor="w", justify="left",
                  wraplength=self._inner_w() - px(4)).pack(fill="x", pady=(0, px(10)))
-        self._step_rows(card, ("Eliges las imágenes de tus dos discos (ISO, GCM o RVZ de Dolphin).",
-                               "Eliges un par de opciones y dónde guardar el .cia.",
-                               "Se crea PuebloCTR.cia (unos 3,5 GB), listo para instalar con FBI "
-                               "(o por Wi-Fi con un QR)."))
-        self._text("Necesitas tu propia copia del juego: edición europea (G4BP08) o americana (G4BE08). "
-                   "Lo que sale de tus discos es solo para tu consola: no se comparte.", DIM, 9)
-        self.next_btn.configure(text="Empezar", state="normal", command=lambda: self._show(1))
+        self._step_rows(card, (_("Eliges las imágenes de tus dos discos (ISO, GCM o RVZ de Dolphin)."),
+                               _("Eliges un par de opciones y dónde guardar el .cia."),
+                               _("Se crea PuebloCTR.cia (unos 3,5 GB), listo para instalar con FBI "
+                                 "(o por Wi-Fi con un QR).")))
+        self._text(_("Necesitas tu propia copia del juego: edición europea (G4BP08) o americana (G4BE08). "
+                     "Lo que sale de tus discos es solo para tu consola: no se comparte."), DIM, 9)
+        self.next_btn.configure(text=_("Empezar"), state="normal", command=lambda: self._show(1))
+
+    def _set_lang(self):
+        """El idioma elegido en la bienvenida: se guarda y se redibuja todo al momento."""
+        code = next((c for c, name in i18n.LANGS.items() if name == self.lang_var.get()), "es")
+        if code == i18n.get_lang():
+            return
+        i18n.set_lang(code)
+        self.sign.configure(text=_("hecho por VENOMSHiNE"))
+        self.back_btn.configure(text=_("Atrás"))
+        self._show(self.page)
 
     def _disc_row(self, parent, label: str, var: tk.StringVar, optional: bool):
         self._section(parent, label)
@@ -463,7 +486,7 @@ class Wizard(tk.Tk):
         self._text("¿Otro formato (CISO, GCZ, WIA)? En Dolphin: clic derecho en el juego → Convertir archivo → ISO "
                    "o RVZ.", DIM, 9)
 
-        def refresh(*_):
+        def refresh(*_args):
             if not pair.winfo_exists():
                 return
             ds = []
@@ -982,7 +1005,7 @@ class Wizard(tk.Tk):
             while True:
                 ev = self.events.get_nowait()
                 if ev[0] == "progress":
-                    _, text, frac = ev
+                    _kind, text, frac = ev
                     self.frac = frac
                     self.pct.configure(text=f"{100 * self.frac:.0f} %")
                     self.status.configure(text=text[:80])
