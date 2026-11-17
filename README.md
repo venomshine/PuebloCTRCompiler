@@ -2,7 +2,7 @@
 
 **Tus discos de GameCube → un solo `.cia` de PuebloCTR para tu New 3DS.** El asistente para Windows y Linux de [PuebloCTR](https://github.com/lonelyversemaker/PuebloCTR): eliges tus dos discos, pulsas un botón y sale `PuebloCTR.cia` con todo el juego dentro. Lo instalas con FBI y listo, sin copiar carpetas a la SD.
 
-> **Es para un solo juego.** Este compilador está hecho y probado únicamente para PuebloCTR: el juego de GameCube que porta, con sus discos europeos (G4BP08) o americanos (G4BE08). Quizás sirva para otros juegos o ports, pero está sin probar. Tal como está, solo acepta esos discos.
+> **Es para un solo juego: Resident Evil 4 de GameCube.** PuebloCTR es el port de ese juego para que funcione en la New 3DS, y este compilador está hecho y probado solo para él, con sus discos europeos (G4BP08) o americanos (G4BE08). Quizás sirva para otros juegos, pero está sin probar. Tal como está, solo acepta esos discos.
 
 *English below · [Read in English](#english)*
 
@@ -107,7 +107,7 @@ Desde el código, sin hacer el `.exe`: `python3 tools/run.py build disco1.iso di
 
 **Your GameCube discs → one PuebloCTR `.cia` for your New 3DS.** A Windows and Linux wizard for [PuebloCTR](https://github.com/lonelyversemaker/PuebloCTR): pick your two discs, press a button, and you get `PuebloCTR.cia` with the whole game inside. Install it with FBI and you're done. There's no folder to copy to the SD card.
 
-> **One game only.** This compiler is made and tested only for PuebloCTR: the GameCube game it ports, with its European (G4BP08) or US (G4BE08) discs. It might work for other games or ports, but that's untested. As it is, it only accepts those discs.
+> **One game only: Resident Evil 4 for GameCube.** PuebloCTR is the port of that game to run on the New 3DS, and this compiler is made and tested only for it, with its European (G4BP08) or US (G4BE08) discs. It might work for other games, but that's untested. As it is, it only accepts those discs.
 
 **Download** from the [latest release](https://github.com/venomshine/PuebloCTRCompiler/releases/latest): `PuebloCTR.exe` for Windows, or `PuebloCTR-Linux.tar.gz` for Linux (unpack it and open `PuebloCTR/PuebloCTR`). It's portable: it installs nothing and needs no Python, and it carries PuebloCTR's engine, PuebloPrep and makerom.
 
