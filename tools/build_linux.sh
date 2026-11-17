@@ -1,7 +1,8 @@
 #!/bin/bash
 # Compila la versión de Linux: out/PuebloCTR-Linux.tar.gz (dentro, la carpeta PuebloCTR/ con el ejecutable PuebloCTR).
-# Todo dentro de Ubuntu 22.04 (Docker): glibc 2.35, para que funcione en Ubuntu 22.04 o posterior, Debian 12 o posterior,
-# Mint 21 o posterior, Fedora 36 o posterior, Arch... PuebloPrep y makerom se compilan ahí también (los de make_runtime.sh son del sistema de la nube).
+# Todo dentro de Ubuntu 22.04 (Docker): glibc 2.35, la más antigua con soporte. Probado en Debian 12 y Fedora 40; debería
+# ir en cualquier Linux de 64 bits con glibc 2.35 o posterior. PuebloPrep y makerom se compilan ahí también (los de
+# make_runtime.sh son del sistema de la nube).
 #
 # Requisitos: Docker y tools/runtime/ hecho con tools/make_runtime.sh (de ahí: re4.elf, icon.smdh, banner.bnr, el .rsf
 # y build/pp-tree, el código de PuebloPrep).
