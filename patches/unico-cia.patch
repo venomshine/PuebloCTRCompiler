@@ -1,0 +1,210 @@
+diff --git a/overlay/port/whole/3ds/gx_3ds.cpp b/overlay/port/whole/3ds/gx_3ds.cpp
+index cad9c59..fa556f3 100644
+--- a/overlay/port/whole/3ds/gx_3ds.cpp
++++ b/overlay/port/whole/3ds/gx_3ds.cpp
+@@ -569,6 +569,7 @@ void finishTexture(Texture* tex, const u8* texels)
+ // a run) for the next pack.
+ const char kMissPath[] = "sdmc:/3ds/pueblo/texmiss.dump";
+ Handle gPakFile;
++u64 gPakBase;  // (PuebloCTR.exe) where the pack starts in gPakFile: 0 on the SD card, its place in the title's romfs
+ re4pica::PakHead gPakHead;
+ // (2026-11-08) The index on the SD card: here the first key of each block of kPakBlock entries (all-7's whole index was
+ // 154 KB of the C heap and grows with the languages and the disc's textures); a block read when looked in (1 KB),
+@@ -615,17 +616,65 @@ bool pakUsable()
+     return gPakCount != 0 && gPakHead.mask == o.mask && gPakHead.mipmaps == (u32) o.mipmaps;
+ }
+ 
++// (PuebloCTR.exe) A file right in the title's romfs root ("romfs:/textures.pak"): the romfs opened raw (as libctru's
++// romfsMountSelf: ARCHIVE_ROMFS, its level 3 from offset 0) and the file found by its name hash in the file table, so
++// the pack is read with FSFILE_Read at offsets as on the SD card (no stdio: the reads come from several threads)
++bool openRomfsFile(const char* name, Handle* file, u64* base)
++{
++    static const u32 zeros[3] = {0, 0, 0};
++    const FS_Path binary = {PATH_BINARY, sizeof(zeros), zeros};
++    if (R_FAILED(FSUSER_OpenFileDirectly(file, ARCHIVE_ROMFS, fsMakePath(PATH_EMPTY, ""), binary, FS_OPEN_READ, 0))) {
++        *file = 0;
++        return false;
++    }
++    u32 h[10] = {}, read = 0;  // header size; dir hash, dir table, file hash, file table (offset, size); data offset
++    u16 want[64];
++    u32 n = 0;
++    for (; name[n] && n < 64; n++) {
++        want[n] = (u8) name[n];
++    }
++    u32 hash = 0 ^ 123456789u;  // (the root's offset is 0)
++    for (u32 i = 0; i < n; i++) {
++        hash = (hash >> 5 | hash << 27) ^ want[i];
++    }
++    bool ok = R_SUCCEEDED(FSFILE_Read(*file, &read, 0, h, sizeof(h))) && read == sizeof(h) && h[0] == 0x28 && h[6] >= 4;
++    u32 at = ~0u;
++    if (ok) {
++        ok = R_SUCCEEDED(FSFILE_Read(*file, &read, h[5] + (hash % (h[6] / 4)) * 4, &at, 4)) && read == 4;
++    }
++    for (int hops = 0; ok && at != ~0u && hops < 4096; hops++) {
++        struct {
++            u32 parent, sibling;
++            u64 offset, size;
++            u32 next, nameBytes;
++            u16 name[64];
++        } e;
++        ok = R_SUCCEEDED(FSFILE_Read(*file, &read, h[7] + at, &e, sizeof(e))) && read >= 0x20;
++        if (ok && e.parent == 0 && e.nameBytes == n * 2 && !memcmp(e.name, want, n * 2)) {
++            *base = (u64) h[9] + e.offset;
++            return true;
++        }
++        at = e.next;
++    }
++    FSFILE_Close(*file);
++    *file = 0;
++    return false;
++}
++
+ void openPak(const char* path)
+ {
++    gPakBase = 0;
++    const bool romfs = strncmp(path, "romfs:/", 7) == 0;
+     path += strncmp(path, "sdmc:", 5) == 0 ? 5 : 0;
+-    if (R_FAILED(FSUSER_OpenFileDirectly(&gPakFile, ARCHIVE_SDMC, fsMakePath(PATH_EMPTY, ""),
+-                                         fsMakePath(PATH_ASCII, path), FS_OPEN_READ, 0))) {
++    if (romfs ? !openRomfsFile(path + 7, &gPakFile, &gPakBase)
++              : R_FAILED(FSUSER_OpenFileDirectly(&gPakFile, ARCHIVE_SDMC, fsMakePath(PATH_EMPTY, ""),
++                                                 fsMakePath(PATH_ASCII, path), FS_OPEN_READ, 0))) {
+         gPakFile = 0;
+         re4_log("3ds: texture pack %s: none (textures made here)", path);
+         return;
+     }
+     u32 read = 0;
+-    bool ok = R_SUCCEEDED(FSFILE_Read(gPakFile, &read, 0, &gPakHead, sizeof(gPakHead))) && read == sizeof(gPakHead) &&
++    bool ok = R_SUCCEEDED(FSFILE_Read(gPakFile, &read, gPakBase, &gPakHead, sizeof(gPakHead))) && read == sizeof(gPakHead) &&
+               gPakHead.magic == re4pica::kPakMagic && gPakHead.version == re4pica::kPakVersion;
+     if (ok) {
+         // the index read once by pieces (64 KB for the moment), each block's first key kept; in order, or not used
+@@ -638,7 +687,7 @@ void openPak(const char* path)
+         for (u32 at = 0; ok && at < gPakHead.count; at += piece) {
+             const u32 n = gPakHead.count - at < piece ? gPakHead.count - at : piece;
+             const u32 bytes = n * sizeof(re4pica::PakEntry);
+-            ok = R_SUCCEEDED(FSFILE_Read(gPakFile, &read, (u64) gPakHead.indexOffset + (u64) at * sizeof(re4pica::PakEntry),
++            ok = R_SUCCEEDED(FSFILE_Read(gPakFile, &read, gPakBase + gPakHead.indexOffset + (u64) at * sizeof(re4pica::PakEntry),
+                                          buf.data(), bytes)) &&
+                  read == bytes;
+             for (u32 i = 0; ok && i < n; i++) {
+@@ -702,7 +751,7 @@ const re4pica::PakEntry* inPak(u64 key)
+         const u32 bytes = n * sizeof(re4pica::PakEntry);
+         c->block = ~0u;
+         if (R_FAILED(FSFILE_Read(gPakFile, &read,
+-                                 (u64) gPakHead.indexOffset + (u64) first * sizeof(re4pica::PakEntry), c->e, bytes)) ||
++                                 gPakBase + gPakHead.indexOffset + (u64) first * sizeof(re4pica::PakEntry), c->e, bytes)) ||
+             read != bytes) {
+             return nullptr;
+         }
+@@ -741,7 +790,7 @@ Texture* loadPacked(const re4pica::PakEntry& e)
+     const u32 from = skip ? (u32) re4pica::totalBytes(pack, fullW, fullH, skip - 1) : 0;
+     const u32 bytes = C3D_TexCalcTotalSize(tex->tex.size, tex->tex.maxLevel);
+     u32 read = 0;
+-    const Result r = FSFILE_Read(gPakFile, &read, (u64) e.offset + from, buildBuffer(), bytes);
++    const Result r = FSFILE_Read(gPakFile, &read, gPakBase + e.offset + from, buildBuffer(), bytes);
+     if (R_FAILED(r) || read != bytes) {
+         static u32 lines;
+         if (lines++ < 8) {
+diff --git a/overlay/port/whole/3ds/main_3ds.cpp b/overlay/port/whole/3ds/main_3ds.cpp
+index e1cabad..d3b5b52 100644
+--- a/overlay/port/whole/3ds/main_3ds.cpp
++++ b/overlay/port/whole/3ds/main_3ds.cpp
+@@ -193,6 +193,19 @@ __attribute__((constructor(101))) void readSettings()
+     for (const char* const* d = kDefaults; *d; d++) {
+         setting(*d);
+     }
++    // (PuebloCTR.exe) a .cia with the game's files inside: the discs, the texture pack and the movies from the title's
++    // romfs (read only); the memory card, the settings and the crash file stay on the SD card. Without them in the romfs
++    // (the release's .cia, the .3dsx): sdmc:/3ds/pueblo as before. pueblo.cfg is read over this, as over the defaults.
++    if (R_SUCCEEDED(romfsInit())) {
++        struct stat st;
++        if (stat("romfs:/data/disc0", &st) == 0 && S_ISDIR(st.st_mode)) {
++            setting("RE4_DATA_DIR=romfs:/data");
++            setting("RE4_3DS_TEXPAK=romfs:/textures.pak");
++            setting("RE4_3DS_MOVIEDIR=romfs:/movie");
++        } else {
++            romfsExit();
++        }
++    }
+ #if !RE4_3DS_RELEASE  // (R1) not in the release: the settings screen before the gameplay instead (R2)
+     re4_3ds_settings_menu();  // L held at the start (or RE4_3DS_MENU=1): the menu writes the file first (6.6)
+ #endif
+@@ -364,6 +377,28 @@ int main(void)
+     speedupReport();
+     re4_3ds_log_fpscr("main thread (the game) at the start");
+     mkdir("sdmc:/3ds/pueblo/saves", 0777);  // (R1) the release's memory card folder (there already: nothing)
++    // (PuebloCTR.exe) the saves imported into its .cia (romfs:/saves/memcard.bin) onto the SD card, once: only when the
++    // card file is not there yet (the player's own saves are never written over)
++    if (const char* card = getenv("RE4_MEMCARD")) {
++        struct stat st;
++        FILE* in = strncmp(card, "sdmc:", 5) == 0 && stat(card, &st) != 0 ? fopen("romfs:/saves/memcard.bin", "rb") : nullptr;
++        if (in) {
++            char part[160];
++            snprintf(part, sizeof(part), "%s.part", card);
++            FILE* out = fopen(part, "wb");
++            static char buf[64 << 10];
++            bool ok = out != nullptr;
++            for (size_t n; ok && (n = fread(buf, 1, sizeof(buf), in)) > 0;) {
++                ok = fwrite(buf, 1, n, out) == n;
++            }
++            ok = out && fclose(out) == 0 && ok && rename(part, card) == 0;
++            if (!ok) {
++                remove(part);
++            }
++            fclose(in);
++            re4_log("3ds: the memory card from the .cia to %s: %s", card, ok ? "copied" : "not copied");
++        }
++    }
+     re4_3ds_crash_start();                // (R1) sdmc:/3ds/pueblo/crash.txt; the CPU's faults to it
+     if (!re4_3ds_check_data()) {  // (R3) the discs, the movies, the texture pack: before any thread of the game
+         re4_3ds_check_exit();
+diff --git a/overlay/port/whole/3ds/movie_3ds.cpp b/overlay/port/whole/3ds/movie_3ds.cpp
+index e3ab04e..33a3418 100644
+--- a/overlay/port/whole/3ds/movie_3ds.cpp
++++ b/overlay/port/whole/3ds/movie_3ds.cpp
+@@ -231,8 +231,10 @@ int hwOpen(const char* fname)
+     if (dot) {
+         *dot = 0;
+     }
+-    char path[96];
+-    snprintf(path, sizeof(path), "sdmc:/3ds/pueblo/movie/%s.mvd", gName);
++    char path[128];
++    const char* movieDir = getenv("RE4_3DS_MOVIEDIR");  // (PuebloCTR.exe: romfs:/movie in its .cia)
++    movieDir = movieDir && *movieDir ? movieDir : "sdmc:/3ds/pueblo/movie";
++    snprintf(path, sizeof(path), "%s/%s.mvd", movieDir, gName);
+     gVideo = fopen(path, "rb");
+     if (!gVideo) {
+         re4_log("movie: %s: no %s, the CRI player", gName, path);
+@@ -246,7 +248,7 @@ int hwOpen(const char* fname)
+         gVideo = nullptr;
+         return 0;
+     }
+-    snprintf(path, sizeof(path), "sdmc:/3ds/pueblo/movie/%s.pcm", gName);
++    snprintf(path, sizeof(path), "%s/%s.pcm", movieDir, gName);
+     gSound = fopen(path, "rb");
+     if (gSound) {
+         setvbuf(gSound, nullptr, _IOFBF, 32 << 10);
+diff --git a/overlay/port/whole/3ds/startcheck_3ds.cpp b/overlay/port/whole/3ds/startcheck_3ds.cpp
+index 2b74995..7d7d971 100644
+--- a/overlay/port/whole/3ds/startcheck_3ds.cpp
++++ b/overlay/port/whole/3ds/startcheck_3ds.cpp
+@@ -177,7 +177,8 @@ const int kMovieCount = (int) (sizeof(kMovies) / sizeof(kMovies[0]));
+ // the movies found in movie/ (one listing of the folder: an fopen each costs ~37 ms on the SD card)
+ int moviesFound()
+ {
+-    DIR* d = opendir("sdmc:/3ds/pueblo/movie");
++    const char* movieDir = getenv("RE4_3DS_MOVIEDIR");  // (PuebloCTR.exe: romfs:/movie)
++    DIR* d = opendir(movieDir && *movieDir ? movieDir : "sdmc:/3ds/pueblo/movie");
+     if (!d) {
+         return 0;
+     }
+@@ -315,7 +316,7 @@ extern "C" int re4_3ds_check_data(void)
+     if (!(pak && *pak == '0')) {
+         char path[160];
+         pak = pak ? pak : "/3ds/pueblo/textures.pak";
+-        snprintf(path, sizeof(path), "%s%s", strncmp(pak, "sdmc:", 5) ? "sdmc:" : "", pak);
++        snprintf(path, sizeof(path), "%s%s", pak[0] == '/' ? "sdmc:" : "", pak);  // (sdmc: or romfs:)
+         re4pica::PakHead head;
+         FILE* f = fopen(path, "rb");
+         const bool found = f != nullptr;
