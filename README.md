@@ -28,7 +28,7 @@ Necesitas:
 
 ## Cómo se usa
 
-1. Abre `PuebloCTR.exe` (o `PuebloCTR` en Linux) → **Empezar**.
+1. Abre `PuebloCTR.exe` (o `PuebloCTR` en Linux). Si quieres, cambia el idioma arriba a la derecha → **Empezar**.
 2. **Tus discos:** elige la imagen del disco 1 y la del disco 2. Te dice al momento qué edición es y si falta algo.
 3. **Opciones:** pack de texturas, vídeos (necesitan ffmpeg: si no lo tienes, el botón **Descargar** lo baja), tus partidas `.gci` / `.gcs` si quieres traerlas, y dónde guardar el `.cia`. Si tienes la SD de la consola conectada, **Guardarlo en la SD** lo deja directamente en `SD:\cia\`.
 4. **Crear el .cia** y espera (unos minutos; los vídeos son lo que más tarda).
@@ -48,6 +48,7 @@ Hacen falta unos 3,5 GB libres en la SD para instalarlo. Después puedes borrar 
 - **Progreso claro:** porcentaje, tiempo que queda (más exacto a partir de la segunda vez), cada fase y lo que está haciendo.
 - **Al terminar:** el archivo, su tamaño y su md5, e instalación por Wi-Fi con un QR para FBI.
 - **Windows y Linux**, con las mismas pantallas y las mismas funciones.
+- **Español e inglés:** el selector está arriba a la derecha de la bienvenida y cambia todo al momento. La primera vez se abre en el idioma del PC, y luego recuerda el que elijas.
 - **Sin ventana**, para pruebas: `PuebloCTR.exe build disco1.rvz disco2.rvz -o PuebloCTR.cia [--sin-texturas] [--sin-videos] [--partida F.gci]` (en Linux, `./PuebloCTR build …`; la salida va a `PuebloCTR.log`, junto al programa).
 
 ## Qué cambia respecto a PuebloCTR
@@ -88,9 +89,13 @@ tools/
   pueblo3ds/ciabuild.py  romfs (IVFC) y .cia por partes, igual byte a byte que makerom
   pueblo3ds/discs.py   reconoce imágenes ISO / GCM / RVZ
   pueblo3ds/serve.py   servidor para instalar con FBI por QR
+  pueblo3ds/i18n.py    idiomas: la clave es el texto en español, con su traducción al inglés
+  i18n_check.py        avisa de los textos sin traducir o que ya no se usan
 patches/unico-cia.patch  el motor que lee el juego del romfs del .cia
 tests/verificar_cia.py   comprueba un .cia (hashes, y archivos contra una carpeta)
 ```
+
+Para añadir o corregir traducciones, edita `tools/pueblo3ds/i18n.py` y ejecuta `python3 tools/i18n_check.py` (avisa de lo que falte).
 
 Desde el código, sin hacer el `.exe`: `python3 tools/run.py build disco1.iso disco2.iso -o PuebloCTR.cia` (con `tools/runtime/` hecho).
 
@@ -108,7 +113,7 @@ Desde el código, sin hacer el `.exe`: `python3 tools/run.py build disco1.iso di
 - ~7 GB free on the drive where the `.cia` is saved while it's made.
 - A New 3DS / New 3DS XL / New 2DS XL with homebrew and FBI.
 
-**Use:** open the program, pick your disc images and choose your options: texture pack, movies (ffmpeg is found or downloaded with one button), your `.gci` / `.gcs` saves and where to save the `.cia`. Then press **Crear el .cia**. Install it over Wi-Fi with the QR code (FBI → *Remote Install* → *Scan QR Code*), or copy it to the SD card and install it with FBI. You need ~3.5 GB free on the SD card.
+**Use:** open the program (the language selector is at the top right of the first screen: English or Spanish; it starts in your PC's language), pick your disc images and choose your options: texture pack, movies (ffmpeg is found or downloaded with one button), your `.gci` / `.gcs` saves and where to save the `.cia`. Then press **Crear el .cia**. Install it over Wi-Fi with the QR code (FBI → *Remote Install* → *Scan QR Code*), or copy it to the SD card and install it with FBI. You need ~3.5 GB free on the SD card.
 
 **What's different from PuebloCTR:** the engine is built with `patches/unico-cia.patch`. It reads the discs, textures and movies from the `.cia`'s own romfs; saves, settings and crash reports stay on the SD card in `sd:/3ds/pueblo/`. Imported saves are copied there on first start, only if no memory card exists yet. The `.cia` is written piece by piece: 3.5 GB in seconds with ~100 MB of RAM, byte-identical to makerom's romfs.
 

@@ -9,6 +9,9 @@ Primera versión, para PuebloCTR v0.1.0-beta1.
   `3ds/pueblo` a la SD.
 - Linux: Ubuntu 22.04 o posterior, Debian 12, Mint 21, Fedora 36, Arch… (glibc 2.35 o posterior). Descarga el ffmpeg
   estático de johnvansickle.com si no hay uno con libx264, y los programas que lanza usan las bibliotecas del sistema.
+- En español y en inglés, con un selector en la bienvenida: la primera vez, el idioma del PC; luego, el elegido.
+- En el menú HOME, el icono dice «PuebloCTR · Compiled by VENOMSHiNE» (el nombre y la descripción siguen siendo
+  los de PuebloCTR).
 - Reconoce cada imagen antes de empezar: edición, número de disco, formatos que no sirven, discos cambiados o mezclados.
 - Pack de texturas, vídeos (busca ffmpeg o lo descarga con un botón) y partidas `.gci` / `.gcs` dentro del `.cia`.
 - El `.cia` se escribe por partes: unos 3,5 GB en unos segundos y con unos 100 MB de RAM (makerom necesitaba 3,5 GB).
