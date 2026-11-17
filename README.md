@@ -58,11 +58,9 @@ PuebloCTR lee el juego de la carpeta `sd:/3ds/pueblo/` que hace PuebloPrep, y su
 - Lo que se escribe sigue en la SD, porque el romfs es de solo lectura: `saves/memcard.bin`, `settings.bin`, `pueblo.cfg` y `crash.txt`.
 - No cambia nada más del juego: misma versión de PuebloCTR (v0.1.0-beta1), mismos ajustes, mismos controles.
 
-## Errores conocidos
+## Antes de actualizar
 
-- **Sin probar todavía en una consola.** En el PC está comprobado que el `.cia` sale bien formado: todos sus hashes, y cada archivo del juego encontrado y leído como lo hace la consola. Falta comprobar en una New 3DS que el juego carga igual de fluido leyendo del `.cia` que de la SD (sobre todo las texturas y al cambiar de zona).
-- Los vídeos todavía no se han probado con discos reales.
-- Cuando salga una versión nueva de PuebloCTR, hay que hacer un `PuebloCTR.exe` nuevo: el motor y el pack de texturas tienen que ser de la misma versión.
+Cuando salga una versión nueva de PuebloCTR, hace falta un `PuebloCTR.exe` nuevo de este proyecto: el motor y el pack de texturas tienen que ser de la misma versión. Tus partidas no se tocan al reinstalar (están en `sd:/3ds/pueblo/saves/`), pero cópialas a otro sitio de vez en cuando.
 
 ## Errores y sugerencias
 
@@ -114,7 +112,7 @@ Desde el código, sin hacer el `.exe`: `python3 tools/run.py build disco1.iso di
 
 **What's different from PuebloCTR:** the engine is built with `patches/unico-cia.patch`. It reads the discs, textures and movies from the `.cia`'s own romfs; saves, settings and crash reports stay on the SD card in `sd:/3ds/pueblo/`. Imported saves are copied there on first start, only if no memory card exists yet. The `.cia` is written piece by piece: 3.5 GB in seconds with ~100 MB of RAM, byte-identical to makerom's romfs.
 
-**Known issues:** not tested on a console yet. On the PC every hash and every game file in the `.cia` checks out, but loading speed from the `.cia` versus the SD card still has to be confirmed on a New 3DS. Movies haven't been tested with real discs yet.
+**Updating:** a new PuebloCTR version needs a new build of this tool (the engine and the texture pack must match). Your saves stay in `sd:/3ds/pueblo/saves/`.
 
 **Build:** `tools/make_runtime.sh`, then `tools/build_exe.sh` (Windows) and `tools/build_linux.sh` (Linux), all with Docker.
 
