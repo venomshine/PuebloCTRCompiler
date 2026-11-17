@@ -50,6 +50,11 @@ O=$P/build/tree/port/build/3ds-release
 R=tools/runtime
 mkdir -p "$R"
 cp "$O/re4.elf" "$O/icon.smdh" "$O/banner.bnr" "$P/build/tree/port/whole/3ds/cia/PuebloCTR.rsf" "$R/"
+# El icono del HOME Menu: el nombre y la descripción de PuebloCTR, y en el editor «PuebloCTR · Compiled by VENOMSHiNE»
+# (su creador y quien compila; se ve arriba al pasar por el icono). Lo demás, igual que su tools/build_cia.sh.
+docker run --rm -v "$P/build/tree/port/whole/3ds/cia":/cia:ro -v "$ROOT/$R":/o puebloctr-build \
+    bannertool makesmdh -s "PuebloCTR" -l "Unofficial New 3DS port, $VERSION" -p "PuebloCTR · Compiled by VENOMSHiNE" \
+    -i /cia/icon.png -o /o/icon.smdh >/dev/null
 
 # 2. PuebloPrep de consola para Windows (y el de Linux, para las pruebas)
 T=$ROOT/build/pp-tree
