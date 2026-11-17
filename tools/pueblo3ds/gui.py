@@ -528,7 +528,8 @@ class Wizard(tk.Tk):
             return "✓  ffmpeg funciona, con libx264", OK
         if self.ff_state == 1:
             return "Ese ffmpeg no trae libx264 (es demasiado mínimo): descarga el completo.", WARN
-        return "No se encuentra ffmpeg: descárgalo (unos 100 MB, una sola vez) o elígelo.", BAD
+        size = "unos 100 MB" if os.name == "nt" else "unos 40 MB"
+        return f"No se encuentra ffmpeg: descárgalo ({size}, una sola vez) o elígelo.", BAD
 
     def _page_options(self):
         self._title("Opciones", "Lo marcado es lo recomendado.")
@@ -957,7 +958,7 @@ class Wizard(tk.Tk):
         if os.name == "nt":
             os.startfile(str(path))  # noqa: S606
         else:
-            subprocess.Popen(["xdg-open", str(path)])
+            subprocess.Popen(["xdg-open", str(path)], env=builder.child_env())
 
     # --- trabajo ---------------------------------------------------------------------------
     def _start(self):

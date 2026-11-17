@@ -69,9 +69,13 @@ def default_runtime() -> Path:
 
 
 def data_dir() -> Path:
-    """Los datos de la herramienta (el registro, ffmpeg descargado, los tiempos): no en el Escritorio."""
-    base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-    d = Path(base) / "PuebloCTR" if base else Path.home() / ".puebloctr"
+    """Los datos de la herramienta (el registro, ffmpeg descargado, los tiempos): no en el Escritorio.
+    Windows: %LOCALAPPDATA%\\PuebloCTR; Linux: ~/.local/share/PuebloCTR (XDG_DATA_HOME)."""
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        d = Path(base) / "PuebloCTR" if base else Path.home() / "PuebloCTR"
+    else:
+        d = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "PuebloCTR"
     try:
         d.mkdir(parents=True, exist_ok=True)
     except OSError:
@@ -79,11 +83,31 @@ def data_dir() -> Path:
     return d
 
 
+def child_env() -> dict:
+    """El entorno para los programas que se lanzan (PuebloPrep, makerom, ffmpeg, el explorador de archivos).
+    En Linux, el ejecutable de PyInstaller pone sus bibliotecas en LD_LIBRARY_PATH: un ffmpeg del sistema (o
+    xdg-open) cargaria las del ejecutable en vez de las suyas y podria fallar. Se les devuelve el de antes."""
+    env = dict(os.environ)
+    if os.name != "nt" and getattr(sys, "frozen", False):
+        for var in ("LD_LIBRARY_PATH", "LD_PRELOAD"):
+            orig = env.pop(var + "_ORIG", None)
+            if orig is not None:
+                env[var] = orig
+            else:
+                env.pop(var, None)
+    return env
+
+
 def _exe(runtime: Path, name: str) -> Path:
-    names = [name + ".exe", name] if os.name == "nt" else [name, name + ".exe"]
+    names = [name + ".exe", name] if os.name == "nt" else [name]
     for n in names:
         p = runtime / n
         if p.is_file():
+            if os.name != "nt" and not os.access(p, os.X_OK):
+                try:  # (por si al sacarlo del ejecutable perdio el permiso de ejecucion)
+                    p.chmod(0o755)
+                except OSError:
+                    pass
             return p
     found = shutil.which(name)
     if found:
@@ -102,6 +126,8 @@ def find_makerom(runtime: Path) -> Path:
 # --- ffmpeg (para los videos) ------------------------------------------------------------------
 
 FFMPEG_ZIP = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"  # el que recomienda PuebloCTR
+# Linux: el ffmpeg estatico de John Van Sickle (con libx264; funciona en cualquier distribucion de 64 bits)
+FFMPEG_LINUX = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
 
 
 def downloaded_ffmpeg() -> Path:
@@ -141,21 +167,23 @@ def ffmpeg_state(path: str) -> int:
         return 0
     try:
         res = subprocess.run([path, "-hide_banner", "-encoders"], capture_output=True, text=True,
-                             errors="replace", timeout=20, creationflags=NO_WINDOW)
+                             errors="replace", timeout=20, creationflags=NO_WINDOW, env=child_env())
     except (OSError, subprocess.SubprocessError):
         return 0
     return 2 if "libx264" in res.stdout else 1
 
 
 def download_ffmpeg(progress: Callable[[int, int], None] | None = None) -> str:
-    """Baja el ffmpeg de gyan.dev (con libx264) y deja solo ffmpeg.exe en los datos de la herramienta."""
+    """Baja un ffmpeg con libx264 y deja solo el ejecutable en los datos de la herramienta: en Windows el de
+    gyan.dev (zip), en Linux el estatico de John Van Sickle (tar.xz)."""
     import urllib.request
     import zipfile
 
     dest = downloaded_ffmpeg()
     dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.parent / "ffmpeg.zip.part"
-    req = urllib.request.Request(FFMPEG_ZIP, headers={"User-Agent": "PuebloCTR-asistente"})
+    url = FFMPEG_ZIP if os.name == "nt" else FFMPEG_LINUX
+    tmp = dest.parent / ("ffmpeg.zip.part" if os.name == "nt" else "ffmpeg.tar.xz.part")
+    req = urllib.request.Request(url, headers={"User-Agent": "PuebloCTR-asistente"})
     with urllib.request.urlopen(req, timeout=60) as r, tmp.open("wb") as f:
         total = int(r.headers.get("Content-Length") or 0)
         done = 0
@@ -167,13 +195,24 @@ def download_ffmpeg(progress: Callable[[int, int], None] | None = None) -> str:
             done += len(block)
             if progress:
                 progress(done, total)
-    with zipfile.ZipFile(tmp) as z:
-        member = next((n for n in z.namelist() if n.lower().endswith("/bin/ffmpeg.exe")), None)
-        if member is None:
-            raise BuildError("el zip de ffmpeg no trae bin/ffmpeg.exe")
-        with z.open(member) as src, (dest.parent / "ffmpeg.exe.part").open("wb") as out:
-            shutil.copyfileobj(src, out)
-    os.replace(dest.parent / "ffmpeg.exe.part", dest)
+    part = dest.parent / (dest.name + ".part")
+    if os.name == "nt":
+        with zipfile.ZipFile(tmp) as z:
+            member = next((n for n in z.namelist() if n.lower().endswith("/bin/ffmpeg.exe")), None)
+            if member is None:
+                raise BuildError("el zip de ffmpeg no trae bin/ffmpeg.exe")
+            with z.open(member) as src, part.open("wb") as out:
+                shutil.copyfileobj(src, out)
+    else:
+        import tarfile
+        with tarfile.open(tmp, "r:xz") as t:
+            member = next((m for m in t.getmembers() if m.isfile() and m.name.endswith("/ffmpeg")), None)
+            if member is None:
+                raise BuildError("el paquete de ffmpeg no trae el ejecutable ffmpeg")
+            with t.extractfile(member) as src, part.open("wb") as out:
+                shutil.copyfileobj(src, out)
+        part.chmod(0o755)
+    os.replace(part, dest)
     tmp.unlink(missing_ok=True)
     return str(dest)
 
@@ -210,8 +249,21 @@ def is_sd_root(path: Path) -> bool:
         return False
 
 
+def _desktop() -> Path | None:
+    """El Escritorio de Linux segun xdg-user-dir (en espanol suele ser ~/Escritorio)."""
+    if os.name == "nt":
+        return None
+    try:
+        out = subprocess.run(["xdg-user-dir", "DESKTOP"], capture_output=True, text=True, timeout=5, env=child_env())
+        p = Path(out.stdout.strip())
+        return p if out.returncode == 0 and p.is_dir() and p != Path.home() else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 def default_output() -> Path:
-    for base in (Path.home() / "Desktop", Path.home() / "Escritorio", Path.home()):
+    desk = _desktop()
+    for base in ([desk] if desk else []) + [Path.home() / "Desktop", Path.home() / "Escritorio", Path.home()]:
         if base.is_dir():
             return base / f"{APP}.cia"
     return Path(f"{APP}.cia").resolve()
@@ -261,7 +313,8 @@ def make_cia(runtime: Path, out: Path, romfs: Path | None = None) -> None:
     ]
     if romfs is not None:
         cmd.append(f"-DAPP_ROMFS={romfs}")
-    res = subprocess.run(cmd, capture_output=True, text=True, errors="replace", creationflags=NO_WINDOW)
+    res = subprocess.run(cmd, capture_output=True, text=True, errors="replace", creationflags=NO_WINDOW,
+                         env=child_env())
     if romfs is not None:
         rsf.unlink(missing_ok=True)
     if res.returncode != 0 or not out.is_file() or out.stat().st_size == 0:
@@ -291,7 +344,8 @@ class Prep:
     def __init__(self, exe: Path, args: list[str], cwd: Path, on_line: Callable[[str], None]):
         self.proc = subprocess.Popen([str(exe), *args], cwd=str(cwd), stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True,
-                                     encoding="utf-8", errors="replace", bufsize=1, creationflags=NO_WINDOW)
+                                     encoding="utf-8", errors="replace", bufsize=1, creationflags=NO_WINDOW,
+                                     env=child_env())
         RUNNING.append(self.proc)
         self.lines: list[str] = []
         try:
