@@ -131,9 +131,9 @@ def _mmss(s: float) -> str:
 
 def _left_text(s: float) -> str:
     if s < 50:
-        return "Ya casi está"
+        return _("Ya casi está")
     m = int(round(s / 60))
-    return f"Quedan unos {m} min" if m >= 2 else "Queda 1 min"
+    return _("Quedan unos {m} min", m=m) if m >= 2 else _("Queda 1 min")
 
 
 TIMES_FILE = "PuebloCTR-tiempos.json"  # junto al exe: cuanto tardo la ultima vez (el tiempo que queda)
@@ -396,13 +396,13 @@ class Wizard(tk.Tk):
         if self.server is not None:
             sent, total, finished, _downloads = self.server.status()
             if 0 < sent < total and not finished:
-                if not messagebox.askyesno(TITLE, "La consola está descargando el .cia. Si sales ahora, se corta.\n\n"
-                                                "¿Salir de todos modos?"):
+                if not messagebox.askyesno(TITLE, _("La consola está descargando el .cia. Si sales ahora, se corta.\n\n"
+                                                  "¿Salir de todos modos?")):
                     return
             self.server.stop()
         if self.working:
-            if not messagebox.askyesno(TITLE, "Se está preparando el juego. Si sales ahora, se cancela (lo ya hecho "
-                                            "se aprovecha la próxima vez).\n\n¿Salir de todos modos?"):
+            if not messagebox.askyesno(TITLE, _("Se está creando el .cia. Si sales ahora, se cancela (lo ya hecho "
+                                              "se aprovecha la próxima vez).\n\n¿Salir de todos modos?")):
                 return
             builder.cancel()
             os._exit(0)
@@ -458,13 +458,13 @@ class Wizard(tk.Tk):
         self.back_btn.configure(text=_("Atrás"))
         self._show(self.page)
 
-    def _disc_row(self, parent, label: str, var: tk.StringVar, optional: bool):
-        self._section(parent, label)
+    def _disc_row(self, parent, n: int, var: tk.StringVar, optional: bool):
+        self._section(parent, _("DISCO 1") if n == 1 else _("DISCO 2  (opcional: sin él se juega hasta la isla)"))
         row = tk.Frame(parent, bg=PANEL)
         row.pack(fill="x")
         self._entry(row, var).pack(side="left", fill="x", expand=True, ipady=px(7))
-        ttk.Button(row, text="Elegir…", style="Plain.TButton",
-                   command=lambda: self._pick_disc(var, label)).pack(side="left", padx=(px(8), 0))
+        ttk.Button(row, text=_("Elegir…"), style="Plain.TButton",
+                   command=lambda: self._pick_disc(var, n)).pack(side="left", padx=(px(8), 0))
         line = tk.Frame(parent, bg=PANEL)
         line.pack(fill="x", pady=(px(8), px(4)))
         dot = _dot(line, "pendiente")
@@ -475,16 +475,16 @@ class Wizard(tk.Tk):
         return dot, status
 
     def _page_discs(self):
-        self._title("Tus discos", "Las imágenes de los dos discos de la misma edición. El orden da igual.")
+        self._title(_("Tus discos"), _("Las imágenes de los dos discos de la misma edición. El orden da igual."))
         card = self._card()
-        w1 = self._disc_row(card, "DISCO 1", self.disc1, False)
+        w1 = self._disc_row(card, 1, self.disc1, False)
         tk.Frame(card, bg=PANEL, height=px(6)).pack(fill="x")
-        w2 = self._disc_row(card, "DISCO 2  (opcional: sin él se juega hasta la isla)", self.disc2, True)
+        w2 = self._disc_row(card, 2, self.disc2, True)
         pair = tk.Label(self.body, text="", bg=BG, fg=DIM, font=_font(10), anchor="w", justify="left",
                         wraplength=px(CARD_W) - px(4))
         pair.pack(fill="x", pady=(0, px(6)))
-        self._text("¿Otro formato (CISO, GCZ, WIA)? En Dolphin: clic derecho en el juego → Convertir archivo → ISO "
-                   "o RVZ.", DIM, 9)
+        self._text(_("¿Otro formato (CISO, GCZ, WIA)? En Dolphin: clic derecho en el juego → Convertir archivo → "
+                     "ISO o RVZ."), DIM, 9)
 
         def refresh(*_args):
             if not pair.winfo_exists():
@@ -497,7 +497,7 @@ class Wizard(tk.Tk):
                     _paint_dot(dot, "pendiente")
                     ds.append(None)
                     continue
-                d = dk.read_disc(Path(p)) if Path(p).is_file() else dk.Disc(Path(p), error="No existe ese archivo.")
+                d = dk.read_disc(Path(p)) if Path(p).is_file() else dk.Disc(Path(p), error=_("No existe ese archivo."))
                 ok, text, lvl = dk.describe(d)
                 status.configure(text=text, fg=LEVEL[lvl] if not ok or lvl != "ok" else FG)
                 _paint_dot(dot, "hecho" if ok else "pendiente")
@@ -515,11 +515,11 @@ class Wizard(tk.Tk):
             self._traced = True
         self._refresh_discs = refresh
         refresh()
-        self.next_btn.configure(text="Continuar", command=lambda: self._show(2))
+        self.next_btn.configure(text=_("Continuar"), command=lambda: self._show(2))
 
-    def _pick_disc(self, var: tk.StringVar, label: str):
-        f = filedialog.askopenfilename(title=f"Imagen del {label.split('  ')[0].lower()}",
-                                       filetypes=[("Imágenes de GameCube", "*.iso *.gcm *.rvz"), ("Todos", "*.*")])
+    def _pick_disc(self, var: tk.StringVar, n: int):
+        f = filedialog.askopenfilename(title=_("Imagen del disco {n}", n=n),
+                                       filetypes=[(_("Imágenes de GameCube"), "*.iso *.gcm *.rvz"), (_("Todos"), "*.*")])
         if f:
             var.set(str(Path(f)))
 
@@ -546,61 +546,61 @@ class Wizard(tk.Tk):
         if self.ff_download is not None:
             return self.ff_download, ACCENT
         if self.ff_state is None:
-            return "Comprobando ffmpeg…", DIM
+            return _("Comprobando ffmpeg…"), DIM
         if self.ff_state == 2:
-            return "✓  ffmpeg funciona, con libx264", OK
+            return "✓  " + _("ffmpeg funciona, con libx264"), OK
         if self.ff_state == 1:
-            return "Ese ffmpeg no trae libx264 (es demasiado mínimo): descarga el completo.", WARN
-        size = "unos 100 MB" if os.name == "nt" else "unos 40 MB"
-        return f"No se encuentra ffmpeg: descárgalo ({size}, una sola vez) o elígelo.", BAD
+            return _("Ese ffmpeg no trae libx264 (es demasiado mínimo): descarga el completo."), WARN
+        mb = 100 if os.name == "nt" else 40
+        return _("No se encuentra ffmpeg: descárgalo (unos {mb} MB, una sola vez) o elígelo.", mb=mb), BAD
 
     def _page_options(self):
-        self._title("Opciones", "Lo marcado es lo recomendado.")
+        self._title(_("Opciones"), _("Lo marcado es lo recomendado."))
         card = self._card(pady=(0, 10))
-        self._section(card, "QUÉ LLEVA")
-        ttk.Checkbutton(card, text="Pack de texturas (unos 350 MB; sin él, tirones al aparecer texturas nuevas)",
+        self._section(card, _("QUÉ LLEVA"))
+        ttk.Checkbutton(card, text=_("Pack de texturas (unos 350 MB; sin él, tirones al aparecer texturas nuevas)"),
                         variable=self.textures, style="Card.TCheckbutton").pack(anchor="w", pady=px(2))
-        ttk.Checkbutton(card, text="Vídeos del juego (unos 220 MB; los convierte ffmpeg)", variable=self.movies,
+        ttk.Checkbutton(card, text=_("Vídeos del juego (unos 220 MB; los convierte ffmpeg)"), variable=self.movies,
                         style="Card.TCheckbutton", command=lambda: self._ff_refresh()).pack(anchor="w", pady=px(2))
         ffrow = tk.Frame(card, bg=PANEL)
         ffrow.pack(fill="x", pady=(px(6), 0), padx=(px(20), 0))
         self.ff_entry = self._entry(ffrow, self.ffmpeg)
         self.ff_entry.pack(side="left", fill="x", expand=True, ipady=px(5))
-        self.ff_pick = ttk.Button(ffrow, text="Elegir…", style="Plain.TButton", command=self._pick_ffmpeg)
+        self.ff_pick = ttk.Button(ffrow, text=_("Elegir…"), style="Plain.TButton", command=self._pick_ffmpeg)
         self.ff_pick.pack(side="left", padx=(px(8), 0))
-        self.ff_dl = ttk.Button(ffrow, text="Descargar", style="Plain.TButton", command=self._download_ffmpeg)
+        self.ff_dl = ttk.Button(ffrow, text=_("Descargar"), style="Plain.TButton", command=self._download_ffmpeg)
         self.ff_dl.pack(side="left", padx=(px(8), 0))
         self.ff_lbl = tk.Label(card, text="", bg=PANEL, fg=DIM, font=_font(9), anchor="w", justify="left",
                                wraplength=self._inner_w() - px(24))
         self.ff_lbl.pack(fill="x", padx=(px(20), 0), pady=(px(4), 0))
 
         card2 = self._card(pady=(0, 10))
-        self._section(card2, "PARTIDAS DE GAMECUBE  (opcional: .gci / .gcs de Dolphin o de una tarjeta)")
+        self._section(card2, _("PARTIDAS DE GAMECUBE  (opcional: .gci / .gcs de Dolphin o de una tarjeta)"))
         srow = tk.Frame(card2, bg=PANEL)
         srow.pack(fill="x")
         self.saves_lbl = tk.Label(srow, text="", bg=PANEL, fg=FG, font=_font(9), anchor="w", justify="left",
                                   wraplength=self._inner_w() - px(240))
         self.saves_lbl.pack(side="left", fill="x", expand=True)
-        ttk.Button(srow, text="Quitar", style="Plain.TButton", command=self._clear_saves).pack(side="right")
-        ttk.Button(srow, text="Añadir…", style="Plain.TButton", command=self._add_saves).pack(side="right",
+        ttk.Button(srow, text=_("Quitar"), style="Plain.TButton", command=self._clear_saves).pack(side="right")
+        ttk.Button(srow, text=_("Añadir…"), style="Plain.TButton", command=self._add_saves).pack(side="right",
                                                                                           padx=(0, px(8)))
         self._saves_text()
 
         card3 = self._card(pady=(0, 0))
-        self._section(card3, "GUARDAR EL .CIA EN  (unos 3,5 GB; mientras se crea, el doble libre en ese disco)")
+        self._section(card3, _("GUARDAR EL .CIA EN  (unos 3,5 GB; mientras se crea, el doble libre en ese disco)"))
         row = tk.Frame(card3, bg=PANEL)
         row.pack(fill="x")
         self._entry(row, self.out).pack(side="left", fill="x", expand=True, ipady=px(7))
-        ttk.Button(row, text="Cambiar…", style="Plain.TButton", command=self._pick_out).pack(side="left",
+        ttk.Button(row, text=_("Cambiar…"), style="Plain.TButton", command=self._pick_out).pack(side="left",
                                                                                              padx=(px(8), 0))
         if self.sd is not None:
             sdrow = tk.Frame(card3, bg=PANEL)
             sdrow.pack(fill="x", pady=(px(8), 0))
-            tk.Label(sdrow, text=f"Está conectada la SD de una 3DS ({self.sd}).", bg=PANEL, fg=DIM,
+            tk.Label(sdrow, text=_("Está conectada la SD de una 3DS ({sd}).", sd=self.sd), bg=PANEL, fg=DIM,
                      font=_font(9), anchor="w").pack(side="left")
-            ttk.Button(sdrow, text="Guardarlo en la SD", style="Plain.TButton",
+            ttk.Button(sdrow, text=_("Guardarlo en la SD"), style="Plain.TButton",
                        command=lambda: self.out.set(str(self.sd / "cia" / "PuebloCTR.cia"))).pack(side="right")
-        self.next_btn.configure(text="Crear el .cia", command=self._start)
+        self.next_btn.configure(text=_("Crear el .cia"), command=self._start)
         self._ff_refresh()
 
     def _ff_refresh(self):
@@ -611,27 +611,28 @@ class Wizard(tk.Tk):
         for w in (self.ff_pick, self.ff_dl):
             w.configure(state="normal" if on and not busy else "disabled")
         self.ff_entry.configure(state="normal" if on and not busy else "disabled")
-        text, color = self._ff_text() if on else ("Sin vídeos: el juego va, pero sus vídeos no se ven.", DIM)
+        text, color = self._ff_text() if on else (_("Sin vídeos: el juego va, pero sus vídeos no se ven."), DIM)
         self.ff_lbl.configure(text=text, fg=color)
         ready = not on or self.ff_state == 2
         self.next_btn.configure(state="normal" if ready and not busy else "disabled")
         self._fit()
 
     def _pick_ffmpeg(self):
-        f = filedialog.askopenfilename(title="ffmpeg.exe", filetypes=[("ffmpeg", "ffmpeg.exe ffmpeg"),
-                                                                      ("Todos", "*.*")])
+        f = filedialog.askopenfilename(title="ffmpeg", filetypes=[("ffmpeg", "ffmpeg.exe ffmpeg"),
+                                                                  (_("Todos"), "*.*")])
         if f:
             self.ffmpeg.set(builder.ffmpeg_in(f))
             self._check_ffmpeg()
             self._ff_refresh()
 
     def _download_ffmpeg(self):
-        self.ff_download = "Descargando ffmpeg…"
+        self.ff_download = _("Descargando ffmpeg…")
         self._ff_refresh()
 
         def job():
             def prog(done, total):
-                t = f"Descargando ffmpeg: {done / 1048576:.0f}" + (f" de {total / 1048576:.0f} MB" if total else " MB")
+                t = (_("Descargando ffmpeg: {done} de {total} MB", done=done >> 20, total=total >> 20) if total
+                     else _("Descargando ffmpeg: {done} MB", done=done >> 20))
                 self.events.put(("ffdl", t))
             try:
                 path = builder.download_ffmpeg(prog)
@@ -644,15 +645,15 @@ class Wizard(tk.Tk):
 
     def _saves_text(self):
         if not self.saves:
-            self.saves_lbl.configure(text="Ninguna (la tarjeta de memoria del port se crea vacía).", fg=DIM)
+            self.saves_lbl.configure(text=_("Ninguna (la tarjeta de memoria del port se crea vacía)."), fg=DIM)
         else:
             names = ", ".join(p.name for p in self.saves[:4]) + ("…" if len(self.saves) > 4 else "")
             self.saves_lbl.configure(text=f"{len(self.saves)}: {names}", fg=FG)
         self._fit()
 
     def _add_saves(self):
-        fs = filedialog.askopenfilenames(title="Partidas de GameCube", filetypes=[("Partidas", "*.gci *.gcs"),
-                                                                                 ("Todos", "*.*")])
+        fs = filedialog.askopenfilenames(title=_("Partidas de GameCube"), filetypes=[(_("Partidas"), "*.gci *.gcs"),
+                                                                                    (_("Todos"), "*.*")])
         for f in fs:
             p = Path(f)
             if p not in self.saves:
@@ -664,13 +665,13 @@ class Wizard(tk.Tk):
         self._saves_text()
 
     def _pick_out(self):
-        f = filedialog.asksaveasfilename(title="Guardar el .cia", defaultextension=".cia",
-                                         initialfile=Path(self.out.get()).name, filetypes=[("CIA de 3DS", "*.cia")])
+        f = filedialog.asksaveasfilename(title=_("Guardar el .cia"), defaultextension=".cia",
+                                         initialfile=Path(self.out.get()).name, filetypes=[(_("CIA de 3DS"), "*.cia")])
         if f:
             self.out.set(str(Path(f)))
 
     def _page_progress(self):
-        self._title("Creando el .cia", "Convirtiendo tus discos. Puedes seguir usando el PC.")
+        self._title(_("Creando el .cia"), _("Convirtiendo tus discos. Puedes seguir usando el PC."))
         card = self._card(pady=(0, 12))
         top = tk.Frame(card, bg=PANEL)
         top.pack(fill="x")
@@ -678,13 +679,13 @@ class Wizard(tk.Tk):
         self.pct.pack(side="left")
         r = tk.Frame(top, bg=PANEL)
         r.pack(side="right")
-        self.left_lbl = tk.Label(r, text="Calculando…", bg=PANEL, fg=FG, font=_font(13, True), anchor="e")
+        self.left_lbl = tk.Label(r, text=_("Calculando…"), bg=PANEL, fg=FG, font=_font(13, True), anchor="e")
         self.left_lbl.pack(anchor="e")
-        self.time_lbl = tk.Label(r, text="Llevas 0:00", bg=PANEL, fg=DIM, font=_font(9), anchor="e")
+        self.time_lbl = tk.Label(r, text=_("Llevas {t}", t="0:00"), bg=PANEL, fg=DIM, font=_font(9), anchor="e")
         self.time_lbl.pack(anchor="e")
         self.bar = tk.Canvas(card, height=px(16), bg=PANEL, highlightthickness=0, bd=0)
         self.bar.pack(fill="x", pady=(px(12), px(10)))
-        self.status = tk.Label(card, text="Preparando…", bg=PANEL, fg=FG, font=_font(10), anchor="w",
+        self.status = tk.Label(card, text=_("Preparando…"), bg=PANEL, fg=FG, font=_font(10), anchor="w",
                                justify="left", wraplength=self._inner_w() - px(4))
         self.status.pack(fill="x")
         self.eta_src = tk.Label(card, text="", bg=PANEL, fg=DIM, font=_font(8), anchor="e")
@@ -693,7 +694,7 @@ class Wizard(tk.Tk):
         row = tk.Frame(self.body, bg=BG)
         row.pack(fill="x", pady=(0, px(12)))
         self.phase_w = {}
-        names = [("discs", "Discos"), ("tex", "Texturas"), ("mov", "Vídeos"), ("cia", "El .cia")]
+        names = [("discs", _("Discos")), ("tex", _("Texturas")), ("mov", _("Vídeos")), ("cia", _("El .cia"))]
         gap = px(8)
         cw = (px(CARD_W) - 3 * gap) // 4
         for i, (key, name) in enumerate(names):
@@ -709,7 +710,7 @@ class Wizard(tk.Tk):
                            wraplength=cw - 2 * px(12), height=2)
             sub.pack(fill="x", pady=(px(6), 0))
             self.phase_w[key] = (c, dot, lbl, sub)
-        tk.Label(self.body, text="Detalles", bg=BG, fg=DIM, font=_font(9, True), anchor="w").pack(fill="x")
+        tk.Label(self.body, text=_("Detalles"), bg=BG, fg=DIM, font=_font(9, True), anchor="w").pack(fill="x")
         logc = self._card(pady=(4, 0))
         self.log = tk.Text(logc, height=6, bg=PANEL, fg=DIM, relief="flat", font=_font(9), highlightthickness=0,
                            wrap="word", bd=0)
@@ -722,7 +723,7 @@ class Wizard(tk.Tk):
         self.log_lines = []  # [clave, texto, hecho]
         self.eta = Eta(_times_path())
         self.frac = 0.0
-        self.next_btn.configure(text="Continuar", state="disabled")
+        self.next_btn.configure(text=_("Continuar"), state="disabled")
         self._tick()
 
     def _draw_bar(self, frac):
@@ -768,40 +769,41 @@ class Wizard(tk.Tk):
             return
         d = st.get("discs", "")
         self._set_phase("discs", "hecho" if st.get("discs_done") else ("ahora" if d else "pendiente"),
-                        "listos" if st.get("discs_done") else d)
-        for key, on, sub_done in (("tex", "tex_on", "hecho"), ("mov", "mov_on", "hechos")):
+                        _("listos") if st.get("discs_done") else d)
+        for key, on, sub_done in (("tex", "tex_on", _("hecho")), ("mov", "mov_on", _("hechos"))):
             if not st.get(on):
-                self._set_phase(key, "pendiente", "no se incluye")
+                self._set_phase(key, "pendiente", _("no se incluye"))
                 continue
             now = st.get(key, "")
             done = st.get(key + "_done")
             self._set_phase(key, "hecho" if done else ("ahora" if now else "pendiente"), sub_done if done else now)
         cia = st.get("cia")
         self._set_phase("cia", "ahora" if cia else "pendiente",
-                        ("montándolo" if cia == "makerom" else f"metiendo el juego: {cia}") if cia else "")
+                        (_("montándolo") if cia == "makerom" else _("comprobándolo") if cia == "hash"
+                         else _("metiendo el juego: {pct}", pct=cia)) if cia else "")
         # el registro: una linea por paso
         if d:
-            self._log("discs", "Discos: " + ("archivos sacados" if st.get("discs_done") else d),
+            self._log("discs", _("Discos: {estado}", estado=_("archivos sacados") if st.get("discs_done") else d),
                       bool(st.get("discs_done")))
         if st.get("tex_on") and (st.get("tex") or st.get("tex_done")):
-            self._log("tex", "Pack de texturas para la GPU de la 3DS" + ("" if st.get("tex_done")
+            self._log("tex", _("Pack de texturas para la GPU de la 3DS") + ("" if st.get("tex_done")
                                                                          else f": {st.get('tex', '')}"),
                       bool(st.get("tex_done")))
         if st.get("mov_on") and (st.get("mov") or st.get("mov_done")):
-            self._log("mov", "Vídeos (H.264 para la 3DS)" + ("" if st.get("mov_done") else f": {st.get('mov', '')}"),
+            self._log("mov", _("Vídeos (H.264 para la 3DS)") + ("" if st.get("mov_done") else f": {st.get('mov', '')}"),
                       bool(st.get("mov_done")))
         if st.get("cia"):
-            self._log("cia", "El .cia, con todo el juego dentro")
+            self._log("cia", _("El .cia, con todo el juego dentro"))
 
     def _tick(self):
         """Cada medio segundo: el reloj, el tiempo que queda y las fases."""
         if self.page != 3:
             return
         left, t = self.eta.update(self.frac)
-        self.time_lbl.configure(text=f"Llevas {_mmss(t)}" + (f"  ·  total ~{int(round((t + left) / 60))} min"
-                                                            if left is not None and t + left > 90 else ""))
-        self.left_lbl.configure(text=_left_text(left) if left is not None else "Calculando…")
-        self.eta_src.configure(text="según tu última compilación" if self.eta.from_prev else "")
+        self.time_lbl.configure(text=_("Llevas {t}", t=_mmss(t)) + (
+            "  ·  " + _("total ~{m} min", m=int(round((t + left) / 60))) if left is not None and t + left > 90 else ""))
+        self.left_lbl.configure(text=_left_text(left) if left is not None else _("Calculando…"))
+        self.eta_src.configure(text=_("según tu última compilación") if self.eta.from_prev else "")
         self._draw_bar(self.frac)
         self._phases()
         self.after(500, self._tick)
@@ -809,16 +811,16 @@ class Wizard(tk.Tk):
     def _page_done(self):
         r = self.report
         if r is None or r.cia is None:
-            self._title("No se pudo preparar", "")
+            self._title(_("No se pudo crear el .cia"), "")
             card = self._card()
-            tk.Label(card, text=getattr(self, "error", "Error desconocido."), bg=PANEL, fg=BAD, font=_font(10),
+            tk.Label(card, text=getattr(self, "error", _("Error desconocido.")), bg=PANEL, fg=BAD, font=_font(10),
                      anchor="w", justify="left", wraplength=self._inner_w() - px(4)).pack(fill="x")
             log = builder.data_dir() / "puebloprep.log"
             if log.is_file():
-                self._text("El registro completo está en puebloprep.log (botón de abajo).", DIM, 9, pady=(6, 0))
-                ttk.Button(self.body, text="Ver el registro", style="Plain.TButton",
+                self._text(_("El registro completo está en puebloprep.log (botón de abajo)."), DIM, 9, pady=(6, 0))
+                ttk.Button(self.body, text=_("Ver el registro"), style="Plain.TButton",
                            command=lambda: self._open_folder(log)).pack(anchor="w", pady=(px(8), 0))
-            self.next_btn.configure(text="Volver", state="normal", command=lambda: self._show(2))
+            self.next_btn.configure(text=_("Volver"), state="normal", command=lambda: self._show(2))
             self.back_btn.configure(state="disabled")
             return
         size = r.cia.stat().st_size / 1048576
@@ -828,12 +830,15 @@ class Wizard(tk.Tk):
         _dot(head, "hecho", bg=BG, size=34).pack(side="left", padx=(0, px(12)))
         txt = tk.Frame(head, bg=BG)
         txt.pack(side="left")
-        tk.Label(txt, text="Listo", bg=BG, fg=FG, font=_font(19, True), anchor="w").pack(fill="x")
-        what = [getattr(self, "edition", "") or r.edition, "texturas" if r.textures else "sin texturas",
-                f"{r.movies} vídeos" if r.movies else "sin vídeos", f"{_mmss(r.seconds)} min"]
+        tk.Label(txt, text=_("Listo"), bg=BG, fg=FG, font=_font(19, True), anchor="w").pack(fill="x")
+        what = [_(getattr(self, "edition", "") or r.edition), _("texturas") if r.textures else _("sin texturas"),
+                _("{n} vídeos", n=r.movies) if r.movies else _("sin vídeos"), f"{_mmss(r.seconds)} min"]
         tk.Label(txt, text="  ·  ".join(w for w in what if w), bg=BG, fg=DIM, font=_font(10), anchor="w").pack(fill="x")
         card = self._card()
-        rows = (("Archivo", str(r.cia)), ("Tamaño", f"{size / 1024:.2f} GB" if size > 1024 else f"{size:.1f} MB"),
+        gb, mb = f"{size / 1024:.2f}", f"{size:.1f}"
+        if i18n.get_lang() == "es":
+            gb, mb = gb.replace(".", ","), mb.replace(".", ",")
+        rows = ((_("Archivo"), str(r.cia)), (_("Tamaño"), f"{gb} GB" if size > 1024 else f"{mb} MB"),
                 ("md5", md5_file(r.cia)))
         for k, v in rows:
             row = tk.Frame(card, bg=PANEL)
@@ -842,29 +847,30 @@ class Wizard(tk.Tk):
             key.pack(side="left", anchor="n")
             tk.Label(row, text=v, bg=PANEL, fg=FG, font=_font(9), anchor="w", justify="left",
                      wraplength=self._inner_w() - key.winfo_reqwidth() - px(4)).pack(side="left", fill="x")
-        notes = [("Es un solo archivo con todo el juego dentro: no hay que copiar nada más a la SD. "
-                  + ("Ya está en la SD: en la consola, FBI → SD → cia → PuebloCTR.cia → Install CIA. "
-                     if on_sd else "Cópialo a la SD (por ejemplo a la carpeta cia) y en la consola: FBI → SD → cia → "
-                                   "PuebloCTR.cia → Install CIA. ")
-                  + "Hacen falta unos 3,5 GB libres en la SD para instalarlo; luego puedes borrar el .cia.", FG),
-                 ("Por Wi-Fi (QR) no hay que copiar nada, pero tarda bastante más: son 3,5 GB.", DIM)]
+        notes = [(_("Es un solo archivo con todo el juego dentro: no hay que copiar nada más a la SD.") + " "
+                  + (_("Ya está en la SD: en la consola, FBI → SD → cia → PuebloCTR.cia → Install CIA.")
+                     if on_sd else _("Cópialo a la SD (por ejemplo a la carpeta cia) y en la consola: FBI → SD → cia → "
+                                     "PuebloCTR.cia → Install CIA.")) + " "
+                  + _("Hacen falta unos 3,5 GB libres en la SD para instalarlo; luego puedes borrar el .cia."), FG),
+                 (_("Por Wi-Fi (QR) no hay que copiar nada, pero tarda bastante más: son 3,5 GB."), DIM)]
         if r.saves:
-            notes.append((f"Partidas dentro del .cia: {', '.join(r.saves)} (pasan a la SD al arrancar la primera vez, "
-                          "si allí no hay ya una tarjeta de memoria).", DIM))
+            notes.append((_("Partidas dentro del .cia: {names} (pasan a la SD al arrancar la primera vez, "
+                            "si allí no hay ya una tarjeta de memoria).", names=", ".join(r.saves)), DIM))
         if r.saves_failed:
-            notes.append((f"No se pudieron importar: {', '.join(r.saves_failed)} (mira el registro).", WARN))
+            notes.append((_("No se pudieron importar: {names} (mira el registro).", names=", ".join(r.saves_failed)),
+                          WARN))
         for w in r.warnings[:3]:
-            notes.append((f"Aviso: {w}", WARN))
-        notes.append(("Lo de tus discos es solo para tu consola: no lo compartas.", DIM))
+            notes.append((_("Aviso: {w}", w=w), WARN))
+        notes.append((_("Lo de tus discos es solo para tu consola: no lo compartas."), DIM))
         for t, col in notes:
             self._text(t, col, 9)
         btns = tk.Frame(self.body, bg=BG)
         btns.pack(fill="x", pady=(px(8), 0))
-        b = [ttk.Button(btns, text="Instalar por Wi-Fi (QR)", style="Accent.TButton", command=lambda: self._show(5)),
-             ttk.Button(btns, text="Abrir la carpeta", style="Plain.TButton",
+        b = [ttk.Button(btns, text=_("Instalar por Wi-Fi (QR)"), style="Accent.TButton", command=lambda: self._show(5)),
+             ttk.Button(btns, text=_("Abrir la carpeta"), style="Plain.TButton",
                         command=lambda: self._open_folder(r.cia.parent))]
         if r.log is not None and r.log.is_file():
-            b.append(ttk.Button(btns, text="Ver el registro", style="Plain.TButton",
+            b.append(ttk.Button(btns, text=_("Ver el registro"), style="Plain.TButton",
                                 command=lambda: self._open_folder(r.log)))
         one_row = sum(x.winfo_reqwidth() for x in b) + px(8) * (len(b) - 1) <= px(CARD_W)
         for i, x in enumerate(b):
@@ -872,17 +878,17 @@ class Wizard(tk.Tk):
                 x.grid(row=0, column=i, sticky="w", padx=(0 if i == 0 else px(8), 0))
             else:
                 x.grid(row=1, column=i - 1, sticky="w", padx=(0 if i == 1 else px(8), 0), pady=(px(8), 0))
-        self.next_btn.configure(text="Salir", state="normal", command=self.destroy)
+        self.next_btn.configure(text=_("Salir"), state="normal", command=self.destroy)
         self.back_btn.configure(state="disabled")
 
     def _page_qr(self):
-        self._title("Instalar por Wi-Fi", "")
+        self._title(_("Instalar por Wi-Fi"), "")
         if self.server is None:
             try:
                 self.server = CiaServer(self.report.cia).start()
             except OSError as exc:
-                self._text(f"No se pudo abrir el servidor: {exc}", BAD)
-                self.next_btn.configure(text="Volver", state="normal", command=lambda: self._show(4))
+                self._text(_("No se pudo abrir el servidor: {exc}", exc=exc), BAD)
+                self.next_btn.configure(text=_("Volver"), state="normal", command=lambda: self._show(4))
                 return
         card = self._card()
         row = tk.Frame(card, bg=PANEL)
@@ -892,8 +898,8 @@ class Wizard(tk.Tk):
         info = tk.Frame(row, bg=PANEL)
         info.pack(side="left", fill="both", expand=True, padx=(px(22), 0))
         wrap = self._inner_w() - self._qr_side() - px(22)
-        steps = ("En la consola, abre FBI.", "Remote Install → Scan QR Code.", "Apunta la cámara a este QR.",
-                 "Acepta la instalación.")
+        steps = (_("En la consola, abre FBI."), "Remote Install → Scan QR Code.", _("Apunta la cámara a este QR."),
+                 _("Acepta la instalación."))
         for i, t in enumerate(steps, 1):
             line = tk.Frame(info, bg=PANEL)
             line.pack(fill="x", pady=px(3))
@@ -904,19 +910,19 @@ class Wizard(tk.Tk):
                                anchor="w")
         self.qr_url.pack(fill="x", pady=(px(10), 0))
         if len(self.server.ips) > 1:
-            ttk.Button(info, text="Probar otra IP", style="Plain.TButton",
+            ttk.Button(info, text=_("Probar otra IP"), style="Plain.TButton",
                        command=self._qr_other_ip).pack(anchor="w", pady=(px(6), 0))
         self.qr_status = tk.Label(info, text="", bg=PANEL, fg=DIM, font=_font(10, True), anchor="w", justify="left",
                                   wraplength=wrap)
         self.qr_status.pack(fill="x", pady=(px(10), 0))
-        self.qr_help = self._text("El PC y la consola tienen que estar en la misma Wi-Fi. Si Windows pregunta por "
-                                  "el firewall, permite el acceso en redes privadas.", DIM, 9, pady=(14, 0))
-        self.next_btn.configure(text="Salir", state="normal", command=self._close)
+        self.qr_help = self._text(_("El PC y la consola tienen que estar en la misma Wi-Fi. Si Windows pregunta por "
+                                    "el firewall, permite el acceso en redes privadas."), DIM, 9, pady=(14, 0))
+        self.next_btn.configure(text=_("Salir"), state="normal", command=self._close)
         self.back_btn.configure(state="normal", command=self._qr_back)
         self._qr_draw()
         self.qr_since = time.monotonic()
         if self.server.ip.startswith("127."):
-            self.qr_status.configure(text="No se detecta la red local: conecta el PC a la Wi-Fi.", fg=BAD)
+            self.qr_status.configure(text=_("No se detecta la red local: conecta el PC a la Wi-Fi."), fg=BAD)
         self._qr_poll()
 
     def _qr_code(self):
@@ -955,24 +961,25 @@ class Wizard(tk.Tk):
             return
         sent, total, finished, downloads = self.server.status()
         if finished:
-            self.qr_status.configure(text="✓  Enviado. Termina la instalación en FBI.", fg=OK)
+            self.qr_status.configure(text="✓  " + _("Enviado. Termina la instalación en FBI."), fg=OK)
         elif downloads and sent:
-            self.qr_status.configure(text=f"Enviando a la consola: {100 * sent / total:.0f} %  "
-                                          f"({sent / 1048576:.1f} de {total / 1048576:.1f} MB)", fg=ACCENT)
+            self.qr_status.configure(text=_("Enviando a la consola: {pct} %  ({sent} de {total} MB)",
+                                            pct=f"{100 * sent / total:.0f}", sent=sent >> 20, total=total >> 20),
+                                     fg=ACCENT)
         elif self.server.requests:
-            self.qr_status.configure(text="La consola ha conectado. Esperando a que empiece la descarga…", fg=DIM)
+            self.qr_status.configure(text=_("La consola ha conectado. Esperando a que empiece la descarga…"), fg=DIM)
         elif not self.server.ip.startswith("127."):
             waited = time.monotonic() - self.qr_since
             if waited < 20:
-                self.qr_status.configure(text="Esperando a la consola…", fg=DIM)
+                self.qr_status.configure(text=_("Esperando a la consola…"), fg=DIM)
             else:
                 # Nada en 20 s: la consola no llega al PC (no es un problema del .cia).
-                self.qr_status.configure(text="La consola no llega al PC.", fg=WARN)
+                self.qr_status.configure(text=_("La consola no llega al PC."), fg=WARN)
                 self.qr_help.configure(
-                    text="1) Mira si hay un aviso del Firewall de Windows (puede estar detrás de esta ventana) "
-                         "y permite el acceso en redes privadas.  2) Comprueba que la consola y el PC están en "
-                         "la misma Wi-Fi.  3) Si el PC tiene VPN o varias redes, pulsa «Probar otra IP».  "
-                         "Si nada funciona, copia el .cia a la SD e instálalo con FBI.", fg=WARN)
+                    text=_("1) Mira si hay un aviso del Firewall de Windows (puede estar detrás de esta ventana) "
+                           "y permite el acceso en redes privadas.  2) Comprueba que la consola y el PC están en "
+                           "la misma Wi-Fi.  3) Si el PC tiene VPN o varias redes, pulsa «Probar otra IP».  "
+                           "Si nada funciona, copia el .cia a la SD e instálalo con FBI."), fg=WARN)
         self._fit()
         self.after(250, self._qr_poll)
 
@@ -1023,7 +1030,7 @@ class Wizard(tk.Tk):
                         self._check_ffmpeg()
                     else:
                         self.ff_state = 0
-                        self.ff_download = f"No se pudo descargar: {ev[2][:120]}"
+                        self.ff_download = _("No se pudo descargar: {err}", err=ev[2][:120])
                         self._ff_refresh()
                         self.ff_download = None
                         continue

@@ -14,12 +14,16 @@ from pathlib import Path
 from . import PUEBLO_VERSION, __version__
 from . import build as builder
 from . import discs as dk
+from . import i18n
+from .i18n import _
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(prog="PuebloCTR", description=f"Asistente {__version__} de PuebloCTR {PUEBLO_VERSION}")
+    i18n.init()  # el idioma elegido en la ventana, o el del sistema
+    ap = argparse.ArgumentParser(prog="PuebloCTR", description=_("Asistente {version} de PuebloCTR {pueblo}", version=__version__,
+                                                                    pueblo=PUEBLO_VERSION))
     sub = ap.add_subparsers(dest="cmd", required=True)
-    b = sub.add_parser("build", help="de las imágenes de disco a un .cia con todo dentro")
+    b = sub.add_parser("build", help=_("de las imágenes de disco a un .cia con todo dentro"))
     b.add_argument("discos", nargs="+", type=Path)
     b.add_argument("-o", "--out", type=Path, default=builder.default_output())
     b.add_argument("--sin-texturas", action="store_true")
@@ -27,10 +31,10 @@ def main(argv: list[str]) -> int:
     b.add_argument("--ffmpeg", default="")
     b.add_argument("--partida", action="append", type=Path, default=[])
     b.add_argument("--runtime", type=Path, default=None)
-    c = sub.add_parser("cia", help="solo PuebloCTR.cia")
+    c = sub.add_parser("cia", help=_("solo el motor en un .cia (sin el juego; para pruebas)"))
     c.add_argument("salida", type=Path)
     c.add_argument("--runtime", type=Path, default=None)
-    i = sub.add_parser("info", help="qué imagen es")
+    i = sub.add_parser("info", help=_("qué imagen es"))
     i.add_argument("discos", nargs="+", type=Path)
     a = ap.parse_args(argv)
 
@@ -54,7 +58,7 @@ def main(argv: list[str]) -> int:
     if not a.sin_videos:
         ff = a.ffmpeg or builder.find_ffmpeg()
         if builder.ffmpeg_state(ff) != 2:
-            print("ffmpeg no encontrado o sin libx264: usa --ffmpeg RUTA o --sin-videos", flush=True)
+            print(_("ffmpeg no encontrado o sin libx264: usa --ffmpeg RUTA o --sin-videos"), flush=True)
             return 2
     last = [""]
 
@@ -69,7 +73,7 @@ def main(argv: list[str]) -> int:
     except builder.BuildError as exc:
         print(f"ERROR: {exc}", flush=True)
         return 1
-    print(f"Listo en {r.seconds:.0f} s: {r.cia} ({r.cia.stat().st_size} bytes)")
+    print(_("Listo en {s} s: {cia} ({size} bytes)", s=f"{r.seconds:.0f}", cia=r.cia, size=r.cia.stat().st_size))
     for w in r.warnings:
-        print("aviso:", w)
+        print(_("aviso:"), w)
     return 0

@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import PUEBLO_VERSION
+from .i18n import _
 
 APP = "PuebloCTR"
 NO_WINDOW = 0x08000000 if os.name == "nt" else 0  # CREATE_NO_WINDOW: sin consolas negras
@@ -112,7 +113,7 @@ def _exe(runtime: Path, name: str) -> Path:
     found = shutil.which(name)
     if found:
         return Path(found)
-    raise BuildError(f"no se encuentra {name} en {runtime}")
+    raise BuildError(_("no se encuentra {name} en {dir}", name=name, dir=runtime))
 
 
 def find_puebloprep(runtime: Path) -> Path:
@@ -200,7 +201,7 @@ def download_ffmpeg(progress: Callable[[int, int], None] | None = None) -> str:
         with zipfile.ZipFile(tmp) as z:
             member = next((n for n in z.namelist() if n.lower().endswith("/bin/ffmpeg.exe")), None)
             if member is None:
-                raise BuildError("el zip de ffmpeg no trae bin/ffmpeg.exe")
+                raise BuildError(_("el zip de ffmpeg no trae bin/ffmpeg.exe"))
             with z.open(member) as src, part.open("wb") as out:
                 shutil.copyfileobj(src, out)
     else:
@@ -208,7 +209,7 @@ def download_ffmpeg(progress: Callable[[int, int], None] | None = None) -> str:
         with tarfile.open(tmp, "r:xz") as t:
             member = next((m for m in t.getmembers() if m.isfile() and m.name.endswith("/ffmpeg")), None)
             if member is None:
-                raise BuildError("el paquete de ffmpeg no trae el ejecutable ffmpeg")
+                raise BuildError(_("el paquete de ffmpeg no trae el ejecutable ffmpeg"))
             with t.extractfile(member) as src, part.open("wb") as out:
                 shutil.copyfileobj(src, out)
         part.chmod(0o755)
@@ -295,7 +296,7 @@ def make_cia(runtime: Path, out: Path, romfs: Path | None = None) -> None:
     """makerom: el .cia con el motor; `romfs` una carpeta para romfs:/ (pequena: makerom la carga en memoria)."""
     for name in ("re4.elf", "PuebloCTR.rsf", "icon.smdh", "banner.bnr"):
         if not (runtime / name).is_file():
-            raise BuildError(f"falta {name} en {runtime}")
+            raise BuildError(_("falta {name} en {dir}", name=name, dir=runtime))
     makerom = find_makerom(runtime)
     out.parent.mkdir(parents=True, exist_ok=True)
     rsf = runtime / "PuebloCTR.rsf"
@@ -318,7 +319,7 @@ def make_cia(runtime: Path, out: Path, romfs: Path | None = None) -> None:
     if romfs is not None:
         rsf.unlink(missing_ok=True)
     if res.returncode != 0 or not out.is_file() or out.stat().st_size == 0:
-        raise BuildError("makerom falló:\n" + (res.stderr or res.stdout)[-2000:])
+        raise BuildError(_("makerom falló:") + "\n" + (res.stderr or res.stdout)[-2000:])
 
 
 def make_full_cia(runtime: Path, data: Path, out: Path, progress: Callable[[str, int, int], None] | None = None):
@@ -362,7 +363,7 @@ class Prep:
         errs = [ln[len("error: "):] for ln in self.lines if ln.startswith("error: ")]
         if errs:
             return errs[-1]
-        return "\n".join(self.lines[-6:]) or f"puebloprep-cli terminó con el código {self.code}"
+        return "\n".join(self.lines[-6:]) or _("puebloprep-cli terminó con el código {code}", code=self.code)
 
 
 RUNNING: list = []  # los procesos en marcha (para cortarlos si se cierra la ventana)
@@ -376,19 +377,33 @@ def cancel() -> None:
             pass
 
 
+def _warning(w: str) -> str:
+    """Los avisos de PuebloPrep que se conocen, en el idioma elegido (los demás, tal cual, en inglés)."""
+    m = re.match(r"(.+): (\d+) bytes, a full GameCube disc has (\d+) \(a trimmed image\?\)$", w)
+    if m:
+        return _("{file}: {size} bytes, y un disco completo tiene {full}: ¿es una imagen recortada?",
+                 file=m.group(1), size=m.group(2), full=m.group(3))
+    if w.startswith("no disc 2"):
+        return _("Sin el disco 2: se juega hasta que el juego pida el segundo disco (la isla).")
+    m = re.match(r"no Movie/(\S+)\.sfd on the discs$", w)
+    if m:
+        return _("Los discos no traen el vídeo {name}.", name=m.group(1))
+    return w
+
+
 def _translate(err: str) -> str:
     """Los errores de PuebloPrep que mas salen, en espanol (el original va detras)."""
     table = [
-        ("not enough room", "No hay espacio suficiente en el disco de destino (hacen falta unos 4 GB, 7 GB con RVZ)."),
-        ("no GameCube disc header", "Una de las imágenes no es un disco de GameCube que se pueda leer."),
-        ("is no GameCube disc", "Una de las imágenes no es un disco de GameCube."),
-        ("given twice", "Has elegido dos veces el mismo disco."),
-        ("different editions", "Los discos son de ediciones distintas."),
-        ("disc 1 is missing", "Falta el disco 1."),
-        ("is not played by this beta", "Esa edición no la juega esta versión (solo Europa G4BP08 y EE. UU. G4BE08)."),
-        ("ffmpeg could not", "ffmpeg no pudo convertir un vídeo (¿es una versión con libx264?)."),
-        ("FAT32", "Un nombre de archivo no cabe en FAT32 (la SD)."),
-        ("the card full", "No se pudo escribir: ¿el disco o la SD están llenos?"),
+        ("not enough room", _("No hay espacio suficiente en el disco de destino (hacen falta unos 4 GB, 7 GB con RVZ).")),
+        ("no GameCube disc header", _("Una de las imágenes no es un disco de GameCube que se pueda leer.")),
+        ("is no GameCube disc", _("Una de las imágenes no es un disco de GameCube.")),
+        ("given twice", _("Has elegido dos veces el mismo disco.")),
+        ("different editions", _("Los discos son de ediciones distintas.")),
+        ("disc 1 is missing", _("Falta el disco 1.")),
+        ("is not played by this beta", _("Esa edición no la juega esta versión (solo Europa G4BP08 y EE. UU. G4BE08).")),
+        ("ffmpeg could not", _("ffmpeg no pudo convertir un vídeo (¿es una versión con libx264?).")),
+        ("FAT32", _("Un nombre de archivo no cabe en FAT32 (la SD).")),
+        ("the card full", _("No se pudo escribir: ¿el disco o la SD están llenos?")),
     ]
     for key, es in table:
         if key in err:
@@ -439,54 +454,54 @@ def build(
         m = re.match(r"RVZ:\s+(\d+) %", line)
         if " RVZ of " in line:
             st["rvz_i"] += 1
-            STATE["discs"] = f"descomprimiendo el RVZ {st['rvz_i'] + 1}"
+            STATE["discs"] = _("descomprimiendo el RVZ {n}", n=st["rvz_i"] + 1)
         if m:
             done_w["rvz"] = W_RVZ * (st["rvz_i"] + int(m.group(1)) / 100)
-            say(f"Descomprimiendo el RVZ {st['rvz_i'] + 1} de {len(rvz)}: {m.group(1)} %")
+            say(_("Descomprimiendo el RVZ {n} de {total}: {pct} %", n=st["rvz_i"] + 1, total=len(rvz), pct=m.group(1)))
             return
         m = re.match(r"disc (\d): +(\d+) %", line)
         if m:
             n = int(m.group(1))
             done_w["rvz"] = weights["rvz"]
             done_w["disc"] = W_DISC * (min(n - 1, len(discs) - 1) + int(m.group(2)) / 100)
-            STATE["discs"] = f"disco {n}: {m.group(2)} %"
-            say(f"Sacando los archivos del disco {n}: {m.group(2)} %")
+            STATE["discs"] = _("disco {n}: {pct} %", n=n, pct=m.group(2))
+            say(_("Sacando los archivos del disco {n}: {pct} %", n=n, pct=m.group(2)))
             return
         m = re.match(r"disc (\d): (\d+) files ->", line)
         if m:
             n = int(m.group(1))
             done_w["disc"] = W_DISC * min(n, len(discs))
-            STATE["discs"] = f"disco {n}: {m.group(2)} archivos"
+            STATE["discs"] = _("disco {n}: {files} archivos", n=n, files=m.group(2))
             if done_w["disc"] >= weights["disc"] - 1e-6:
                 STATE["discs_done"] = True
-            say(f"Disco {n}: {m.group(2)} archivos")
+            say(_("Disco {n}: {files} archivos", n=n, files=m.group(2)))
             return
         m = re.match(r"textures: +(\d+) %", line)
         if m:
             STATE["discs_done"] = True
             done_w["tex"] = W_TEX * int(m.group(1)) / 100
             STATE["tex"] = f"{m.group(1)} %"
-            say(f"Pack de texturas: {m.group(1)} %")
+            say(_("Pack de texturas: {pct} %", pct=m.group(1)))
             return
         if line.startswith("textures: ") and line.rstrip().endswith("textures.pak"):
             done_w["tex"] = weights["tex"]
             STATE["tex_done"] = True
-            say("Pack de texturas hecho")
+            say(_("Pack de texturas hecho"))
             return
         m = re.match(r"movies: (\w+): (\d+) frames", line)
         if m:
             st["movie_i"] += 1
             done_w["mov"] = W_MOVIES * st["movie_i"] / len(MOVIES)
-            STATE["mov"] = f"{st['movie_i']} de {len(MOVIES)}"
+            STATE["mov"] = _("{n} de {total}", n=st["movie_i"], total=len(MOVIES))
             report.movies = st["movie_i"]
-            say(f"Vídeos: {st['movie_i']} de {len(MOVIES)}")
+            say(_("Vídeos: {n} de {total}", n=st["movie_i"], total=len(MOVIES)))
             return
         m = re.match(r"movies: (\w+)$", line)
         if m:
             STATE["discs_done"] = True
             STATE["tex_done"] = STATE.get("tex_done") or not textures
-            STATE["mov"] = f"{st['movie_i']} de {len(MOVIES)}"
-            say(f"Vídeos: convirtiendo {m.group(1)} ({st['movie_i'] + 1} de {len(MOVIES)})")
+            STATE["mov"] = _("{n} de {total}", n=st["movie_i"], total=len(MOVIES))
+            say(_("Vídeos: convirtiendo {name} ({n} de {total})", name=m.group(1), n=st["movie_i"] + 1, total=len(MOVIES)))
             return
         if line.startswith("movies: ") and " of " in line and " in " in line:
             done_w["mov"] = weights["mov"]
@@ -496,7 +511,7 @@ def build(
             w = line[len("warning: "):]
             for d in discs:
                 w = w.replace(str(d), d.name)
-            report.warnings.append(w)
+            report.warnings.append(_warning(w))
             return
         m = re.match(r".*?: (.+?), disc (\d), \"", line)
         if m and not report.edition:
@@ -506,9 +521,9 @@ def build(
     need = sum(Path(d).stat().st_size if not _is_rvz(d) else 1_459_978_240 for d in discs) + (400 << 20) + (230 << 20)
     have = free_bytes(cia.parent)
     if 0 < have < need * 2 and work_dir(cia).parent == cia.parent:
-        raise BuildError(f"No hay espacio suficiente en {cia.anchor or cia.parent}: hacen falta unos "
-                         f"{need * 2 / 1e9:.0f} GB libres mientras se prepara (hay {have / 1e9:.1f} GB). "
-                         "Elige otro disco para el .cia.")
+        raise BuildError(_("No hay espacio suficiente en {where}: hacen falta unos {need} GB libres mientras se "
+                           "crea el .cia (hay {have} GB). Elige otro disco para el .cia.",
+                           where=cia.anchor or cia.parent, need=f"{need * 2 / 1e9:.0f}", have=f"{have / 1e9:.1f}"))
     out.mkdir(parents=True, exist_ok=True)
     args = []
     for d in discs:
@@ -518,8 +533,8 @@ def build(
         args.append("--textures")
     if movies:
         args += ["--movies", "--ffmpeg", ffmpeg_in(ffmpeg) or "ffmpeg"]
-    say("Leyendo los discos")
-    STATE["discs"] = "leyendo"
+    say(_("Leyendo los discos"))
+    STATE["discs"] = _("leyendo")
     p = _run(prep, args, logdir, on_line)
     if p.code != 0:
         raise BuildError(_translate(p.error()))
@@ -527,7 +542,7 @@ def build(
 
     # las partidas, a la tarjeta de memoria del port
     if saves:
-        say("Metiendo las partidas en la tarjeta de memoria")
+        say(_("Metiendo las partidas en la tarjeta de memoria"))
         args = ["--out", str(out)]
         (out / "3ds" / "pueblo" / "saves" / "memcard.bin").unlink(missing_ok=True)  # solo las de esta vez
         for s in saves:
@@ -545,16 +560,16 @@ def build(
 
     # el .cia: makerom con el motor y, dentro, todo lo de 3ds/pueblo
     STATE["cia"] = "makerom"
-    say("Montando el .cia (makerom)")
+    say(_("Montando el .cia (makerom)"))
 
     def cia_progress(stage: str, done: int, total: int) -> None:
         f = done / max(1, total)
         done_w["cia"] = W_CIA * (0.75 * f if stage == "romfs" else 0.75 + 0.25 * f)
-        STATE["cia"] = f"{100 * f:.0f} %" if stage == "romfs" else "comprobando"
+        STATE["cia"] = f"{100 * f:.0f} %" if stage == "romfs" else "hash"  # (la ventana lo traduce)
         if stage == "romfs":
-            say(f"Metiendo el juego en el .cia: {done / 1048576:.0f} de {total / 1048576:.0f} MB")
+            say(_("Metiendo el juego en el .cia: {done} de {total} MB", done=done >> 20, total=total >> 20))
         else:
-            say(f"Calculando el hash del .cia: {100 * f:.0f} %")
+            say(_("Calculando el hash del .cia: {pct} %", pct=f"{100 * f:.0f}"))
 
     cia.parent.mkdir(parents=True, exist_ok=True)
     make_full_cia(runtime, out / "3ds" / "pueblo", cia, cia_progress)
@@ -563,7 +578,7 @@ def build(
     shutil.rmtree(out, ignore_errors=True)  # la carpeta temporal: ya esta todo en el .cia
     report.seconds = time.monotonic() - t0
     if progress:
-        progress("Listo", 1.0)
+        progress(_("Listo"), 1.0)
     return report
 
 
